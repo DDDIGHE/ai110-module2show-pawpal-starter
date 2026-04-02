@@ -4,8 +4,14 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The initial UML has four classes, split into data objects and a logic class:
+
+- **Pet** (dataclass) — Holds pet identity: name and species. Provides a `summary()` for display. Has no behavior of its own; it is owned by an Owner.
+- **Owner** (dataclass) — Holds the owner's name, daily time budget (`available_minutes`), a reference to their Pet, and a list of free-text preferences. The Owner is the entry point for the Scheduler to access both human constraints and pet info.
+- **Task** (dataclass) — Represents a single care activity: title, duration in minutes, priority (low/medium/high), category (walk, feed, meds, etc.), and an `is_required` flag to distinguish must-do tasks from optional ones.
+- **Scheduler** — The only class with real logic. Takes an Owner (and through it, the Pet), receives a list of Tasks, and produces an ordered daily plan via `generate_plan()`. Also provides `explain_plan()` to justify the schedule in human-readable form.
+
+Key relationship: Owner "has-a" Pet (1:1), and Scheduler "uses" Owner (1:1) and "schedules" Tasks (1:many). The Scheduler accesses the Pet through `owner.pet` rather than holding a separate reference, to avoid redundancy.
 
 **Core user actions:**
 
@@ -17,8 +23,13 @@
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes, three changes were made after reviewing the skeleton for missing relationships and logic bottlenecks:
+
+1. **Removed redundant `Scheduler → Pet` link.** The initial UML had the Scheduler hold both an `owner` and a separate `pet` reference. Since Owner already has `pet`, keeping both created two paths to the same object that could go out of sync. Now the Scheduler accesses the pet via `self.owner.pet`.
+
+2. **Added `skipped` list to Scheduler.** The original design only tracked the final `plan` and `total_time_used`. Without a `skipped` list, `explain_plan()` would have no way to tell the user which tasks were dropped and why. This is important for transparency — a plan that silently ignores tasks is frustrating.
+
+3. **Added input validation on Task and Scheduler.** `Task.priority` was a raw string with no guard — passing `"urgent"` or `"HIGH"` would crash the scheduler at lookup time. Added `__post_init__` to normalize to lowercase and reject invalid values. Also added a check that `Owner.available_minutes > 0` in `Scheduler.__init__`, since a zero or negative budget is meaningless and would produce an empty plan with no explanation.
 
 ---
 
