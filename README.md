@@ -31,6 +31,28 @@ Beyond basic priority ordering, PawPal+ includes:
 - **Conflict detection** — `detect_conflicts()` warns (without crashing) when duplicate task titles or multiple tasks of the same category land in the same time slot.
 - **Recurring tasks** — completing a daily or weekly task auto-creates the next occurrence with an updated `due_date`. One-off tasks (`as_needed`) do not recur.
 
+## Testing PawPal+
+
+Run the full test suite:
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+The suite contains **16 tests** covering five areas:
+
+| Area | Tests | What's verified |
+|---|---|---|
+| Sorting | 3 | Time-slot ordering, stable sort within slots, "anytime" passthrough |
+| Recurrence | 4 | Daily (+1 day), weekly (+7 days), as_needed (no repeat), re-plan excludes completed |
+| Conflict detection | 4 | Same category warns, duplicate title warns, no false positives, cross-pet detection |
+| Scheduling edge cases | 3 | Empty task list, required tasks exceeding budget, exact budget fit |
+| Basics | 2 | Task completion, task addition to pet |
+
+**Confidence Level: 4/5**
+
+Core scheduling, sorting, recurrence, and conflict logic are well-covered with both happy paths and edge cases. One star withheld because the Streamlit UI integration and `Owner.preferences` behavior are not yet tested — preferences are stored but not used by the scheduler.
+
 ## Getting started
 
 ### Setup
