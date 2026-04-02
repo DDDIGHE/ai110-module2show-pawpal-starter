@@ -22,6 +22,15 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+Beyond basic priority ordering, PawPal+ includes:
+
+- **Time-slot sorting** — tasks have a `preferred_time` (morning, afternoon, evening). `sort_by_time()` reorders the plan so morning tasks come first, using Python's stable sort to preserve priority order within each slot.
+- **Multi-criteria filtering** — `filter_tasks()` narrows tasks by completion status, pet name, or both. Useful for viewing only pending tasks or tasks for a specific pet.
+- **Conflict detection** — `detect_conflicts()` warns (without crashing) when duplicate task titles or multiple tasks of the same category land in the same time slot.
+- **Recurring tasks** — completing a daily or weekly task auto-creates the next occurrence with an updated `due_date`. One-off tasks (`as_needed`) do not recur.
+
 ## Getting started
 
 ### Setup

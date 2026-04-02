@@ -42,8 +42,14 @@ Yes, three changes were made after reviewing the skeleton for missing relationsh
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The conflict detection system checks for same-category or duplicate-title tasks within the same **time slot** (morning/afternoon/evening), but it does not compute actual overlapping time ranges. For example, if two 30-minute morning tasks are scheduled, the system flags "multiple walk tasks in morning slot" but cannot tell you whether they actually overlap in minutes — it treats the entire morning as one block.
+
+This is a reasonable tradeoff because:
+- Pet care tasks rarely have exact clock times ("walk at 8:07 AM"). Owners think in broad slots: morning, afternoon, evening.
+- Implementing true overlap detection would require start/end timestamps for each task and interval comparison logic, adding significant complexity for minimal real-world benefit in this use case.
+- The current approach catches the most common mistake — accidentally scheduling the same type of activity twice in the same part of the day — which is the main thing a pet owner would want to know.
+
+A secondary tradeoff: the AI suggested rewriting `detect_conflicts()` using `Counter` and generator expressions for a more "Pythonic" style. The compressed version saved ~5 lines but was harder to read and debug. I kept the explicit loop version because readability matters more than brevity in a method that produces user-facing warnings.
 
 ---
 

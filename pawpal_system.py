@@ -1,8 +1,10 @@
 """PawPal+ logic layer — full implementation."""
 
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 
 PRIORITY_WEIGHT = {"high": 3, "medium": 2, "low": 1}
+TIME_SLOT_ORDER = {"morning": 0, "afternoon": 1, "evening": 2, "anytime": 3}
 
 
 @dataclass
@@ -13,6 +15,8 @@ class Task:
     category: str = "general"  # walk, feed, meds, groom, enrichment
     is_required: bool = False
     frequency: str = "daily"  # daily, weekly, as_needed
+    preferred_time: str = "anytime"  # morning, afternoon, evening, anytime
+    due_date: date = field(default_factory=date.today)
     completed: bool = False
 
     def __post_init__(self):
@@ -28,6 +32,21 @@ class Task:
     def reset(self):
         """Reset this task to incomplete."""
         self.completed = False
+
+    def next_occurrence(self) -> "Task | None":
+        """Create next occurrence for recurring tasks. Returns None for as_needed."""
+        if self.frequency == "daily":
+            delta = timedelta(days=1)
+        elif self.frequency == "weekly":
+            delta = timedelta(weeks=1)
+        else:
+            return None
+        return Task(
+            title=self.title, duration_minutes=self.duration_minutes,
+            priority=self.priority, category=self.category,
+            is_required=self.is_required, frequency=self.frequency,
+            preferred_time=self.preferred_time, due_date=self.due_date + delta,
+        )
 
 
 @dataclass
@@ -92,6 +111,26 @@ class Scheduler:
         self.skipped: list[Task] = []
         self.total_time_used: int = 0
 
+    def complete_task(self, task: Task, pet: Pet) -> Task | None:
+        """Mark task done and auto-create next occurrence for recurring tasks."""
+        task.mark_done()
+        next_task = task.next_occurrence()
+        if next_task:
+            pet.add_task(next_task)
+        return next_task
+
+    def filter_tasks(self, completed: bool | None = None, pet_name: str | None = None) -> list[Task]:
+        """Filter owner's tasks by completion status and/or pet name."""
+        results = []
+        for pet in self.owner.pets:
+            if pet_name and pet.name != pet_name:
+                continue
+            for task in pet.tasks:
+                if completed is not None and task.completed != completed:
+                    continue
+                results.append(task)
+        return results
+
     def generate_plan(self, tasks: list[Task] | None = None) -> list[Task]:
         """Greedy schedule: required first, then by priority, until time runs out.
         If tasks not provided, pulls pending tasks from owner's pets."""
@@ -124,6 +163,39 @@ class Scheduler:
 
         return self.plan
 
+    def detect_conflicts(self) -> list[str]:
+        """Check for scheduling conflicts: duplicate titles or overfilled time slots."""
+        warnings = []
+        # Group scheduled tasks by time slot
+        slots: dict[str, list[Task]] = {}
+        for task in self.plan:
+            slots.setdefault(task.preferred_time, []).append(task)
+
+        for slot, tasks in slots.items():
+            # Duplicate titles in same slot
+            titles = [t.title for t in tasks]
+            seen = set()
+            for title in titles:
+                if title in seen:
+                    warnings.append(f"Conflict: '{title}' appears more than once in {slot} slot")
+                seen.add(title)
+
+            # Slot overload (same category competing for same time)
+            categories: dict[str, list[str]] = {}
+            for t in tasks:
+                categories.setdefault(t.category, []).append(t.title)
+            for cat, cat_titles in categories.items():
+                if len(cat_titles) > 1:
+                    warnings.append(
+                        f"Conflict: multiple {cat} tasks in {slot} slot: {', '.join(cat_titles)}")
+
+        return warnings
+
+    def sort_by_time(self) -> list[Task]:
+        """Reorder the plan by preferred time slot (morning → afternoon → evening → anytime)."""
+        self.plan.sort(key=lambda t: TIME_SLOT_ORDER.get(t.preferred_time, 3))
+        return self.plan
+
     def explain_plan(self) -> str:
         """Human-readable plan with reasoning."""
         if not self.plan:
@@ -150,5 +222,11 @@ class Scheduler:
         if req_time > self.owner.available_minutes:
             lines.append(f"\nWarning: required tasks need {req_time} min, "
                          f"exceeding {self.owner.available_minutes} min budget.")
+
+        conflicts = self.detect_conflicts()
+        if conflicts:
+            lines.append("\nConflicts detected:")
+            for warning in conflicts:
+                lines.append(f"  ! {warning}")
 
         return "\n".join(lines)
